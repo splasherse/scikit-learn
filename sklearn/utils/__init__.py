@@ -39,6 +39,7 @@ from .validation import (
     column_or_1d,
     indexable,
 )
+from ._synthetic import generate_synthetic_data
 
 # TODO(1.7): remove parallel_backend and register_parallel_backend
 msg = "deprecated in 1.5 to be removed in 1.7. Use joblib.{} instead."
@@ -79,6 +80,7 @@ __all__ = [
     "safe_mask",
     "gen_batches",
     "gen_even_slices",
+    "generate_synthetic_data"
 ]
 
 

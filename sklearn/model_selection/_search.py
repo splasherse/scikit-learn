@@ -24,6 +24,9 @@ import numpy as np
 from numpy.ma import MaskedArray
 from scipy.stats import rankdata
 
+from sklearn.model_selection import cross_val_score
+from scipy.optimize import minimize
+
 from ..base import BaseEstimator, MetaEstimatorMixin, _fit_context, clone, is_classifier
 from ..exceptions import NotFittedError
 from ..metrics import check_scoring
@@ -57,7 +60,7 @@ from ._validation import (
     _warn_or_raise_about_fit_failures,
 )
 
-__all__ = ["GridSearchCV", "ParameterGrid", "ParameterSampler", "RandomizedSearchCV"]
+__all__ = ["GridSearchCV", "ParameterGrid", "ParameterSampler", "RandomizedSearchCV", "BayesianOptimizationSearchCV"]
 
 
 class ParameterGrid:
@@ -127,7 +130,7 @@ class ParameterGrid:
                         f" {value!r} with shape {value.shape}"
                     )
                 if isinstance(value, str) or not isinstance(
-                    value, (np.ndarray, Sequence)
+                        value, (np.ndarray, Sequence)
                 ):
                     raise TypeError(
                         f"Parameter grid for parameter {key!r} needs to be a list or a"
@@ -289,7 +292,7 @@ class ParameterSampler:
                 )
             for key in dist:
                 if not isinstance(dist[key], Iterable) and not hasattr(
-                    dist[key], "rvs"
+                        dist[key], "rvs"
                 ):
                     raise TypeError(
                         f"Parameter grid for parameter {key!r} is not iterable "
@@ -407,17 +410,17 @@ class BaseSearchCV(MetaEstimatorMixin, BaseEstimator, metaclass=ABCMeta):
 
     @abstractmethod
     def __init__(
-        self,
-        estimator,
-        *,
-        scoring=None,
-        n_jobs=None,
-        refit=True,
-        cv=None,
-        verbose=0,
-        pre_dispatch="2*n_jobs",
-        error_score=np.nan,
-        return_train_score=True,
+            self,
+            estimator,
+            *,
+            scoring=None,
+            n_jobs=None,
+            refit=True,
+            cv=None,
+            verbose=0,
+            pre_dispatch="2*n_jobs",
+            error_score=np.nan,
+            return_train_score=True,
     ):
         self.scoring = scoring
         self.estimator = estimator
@@ -769,9 +772,9 @@ class BaseSearchCV(MetaEstimatorMixin, BaseEstimator, metaclass=ABCMeta):
         valid_refit_dict = isinstance(self.refit, str) and self.refit in scores
 
         if (
-            self.refit is not False
-            and not valid_refit_dict
-            and not callable(self.refit)
+                self.refit is not False
+                and not valid_refit_dict
+                and not callable(self.refit)
         ):
             raise ValueError(multimetric_refit_msg)
 
@@ -1047,7 +1050,7 @@ class BaseSearchCV(MetaEstimatorMixin, BaseEstimator, metaclass=ABCMeta):
             results["mean_%s" % key_name] = array_means
 
             if key_name.startswith(("train_", "test_")) and np.any(
-                ~np.isfinite(array_means)
+                    ~np.isfinite(array_means)
             ):
                 warnings.warn(
                     (
@@ -1512,18 +1515,18 @@ class GridSearchCV(BaseSearchCV):
     }
 
     def __init__(
-        self,
-        estimator,
-        param_grid,
-        *,
-        scoring=None,
-        n_jobs=None,
-        refit=True,
-        cv=None,
-        verbose=0,
-        pre_dispatch="2*n_jobs",
-        error_score=np.nan,
-        return_train_score=False,
+            self,
+            estimator,
+            param_grid,
+            *,
+            scoring=None,
+            n_jobs=None,
+            refit=True,
+            cv=None,
+            verbose=0,
+            pre_dispatch="2*n_jobs",
+            error_score=np.nan,
+            return_train_score=False,
     ):
         super().__init__(
             estimator=estimator,
@@ -1895,20 +1898,20 @@ class RandomizedSearchCV(BaseSearchCV):
     }
 
     def __init__(
-        self,
-        estimator,
-        param_distributions,
-        *,
-        n_iter=10,
-        scoring=None,
-        n_jobs=None,
-        refit=True,
-        cv=None,
-        verbose=0,
-        pre_dispatch="2*n_jobs",
-        random_state=None,
-        error_score=np.nan,
-        return_train_score=False,
+            self,
+            estimator,
+            param_distributions,
+            *,
+            n_iter=10,
+            scoring=None,
+            n_jobs=None,
+            refit=True,
+            cv=None,
+            verbose=0,
+            pre_dispatch="2*n_jobs",
+            random_state=None,
+            error_score=np.nan,
+            return_train_score=False,
     ):
         self.param_distributions = param_distributions
         self.n_iter = n_iter
@@ -1932,3 +1935,126 @@ class RandomizedSearchCV(BaseSearchCV):
                 self.param_distributions, self.n_iter, random_state=self.random_state
             )
         )
+
+
+class BayesianOptimizationSearchCV(BaseSearchCV):
+    """Bayesian optimization over specified parameter values for an estimator.
+
+    Important members are fit, predict.
+
+    BayesianOptimizationSearchCV implements a "fit" method.
+
+    The parameters of the estimator used to apply these methods are optimized
+    by Bayesian optimization over a parameter grid.
+
+    Read more in the :ref:`User Guide <bayesian_optimization_search>`.
+
+    Parameters
+    ----------
+    estimator : estimator object
+        This is assumed to implement the scikit-learn estimator interface.
+        Either estimator needs to provide a ``score`` function,
+        or ``scoring`` must be passed.
+
+    param_distributions : dict
+        Dictionary with parameters names (`str`) as keys and distributions
+        or lists of parameter settings to try as values.
+
+    n_iter : int, default=50
+        Number of parameter settings that are sampled. n_iter trades
+        off runtime vs quality of the solution.
+
+    cv : int, cross-validation generator or an iterable, default=5
+        Determines the cross-validation splitting strategy.
+        Possible inputs for cv are:
+        - None, to use the default 5-fold cross validation,
+        - integer, to specify the number of folds in a `(Stratified)KFold`,
+        - :term:`CV splitter`,
+        - An iterable yielding (train, test) splits as arrays of indices.
+
+    scoring : str, callable, list, tuple or dict, default=None
+        Strategy to evaluate the performance of the cross-validated model on
+        the test set.
+
+    random_state : int, RandomState instance or None, default=None
+        Controls the randomness of the estimator.
+
+    n_jobs : int, default=None
+        Number of jobs to run in parallel.
+        ``None`` means 1 unless in a :obj:`joblib.parallel_backend` context.
+        ``-1`` means using all processors.
+
+    Attributes
+    ----------
+    cv_results_ : dict of numpy (masked) ndarrays
+        A dict with keys as column headers and values as columns, that can be
+        imported into a pandas ``DataFrame``.
+
+    best_estimator_ : estimator
+        Estimator that was chosen by the search, i.e. estimator which gave
+        highest score (or smallest loss if specified) on the left out data.
+
+    best_score_ : float
+        Mean cross-validated score of the best_estimator.
+
+    best_params_ : dict
+        Parameter setting that gave the best results on the hold out data.
+
+    best_index_ : int
+        The index (of the ``cv_results_`` arrays) which corresponds to the best
+        candidate parameter setting.
+
+    scorer_ : function or a dict
+        Scorer function used on the held out data to choose the best parameters
+        for the model.
+
+    n_splits_ : int
+        The number of cross-validation splits (folds/iterations).
+
+    See Also
+    --------
+    GridSearchCV : Exhaustive search over specified parameter values for an estimator.
+    RandomizedSearchCV : Randomized search on hyper parameters.
+
+    Notes
+    -----
+    The parameters selected are those that maximize the score of the left out
+    data, unless an explicit score is passed in which case it is used instead.
+
+    Examples
+    --------
+    >>> from sklearn import svm, datasets
+    >>> from sklearn.model_selection import BayesianOptimizationSearchCV
+    >>> iris = datasets.load_iris()
+    >>> parameters = {'C': (1, 10), 'kernel': ['linear', 'rbf']}
+    >>> svc = svm.SVC()
+    >>> clf = BayesianOptimizationSearchCV(svc, parameters, n_iter=10)
+    >>> clf.fit(iris.data, iris.target)
+    BayesianOptimizationSearchCV(cv=5,
+                                 estimator=SVC(),
+                                 n_iter=10,
+                                 param_distributions={'C': (1, 10), 'kernel': ['linear', 'rbf']})
+    """
+    def __init__(self, estimator, param_distributions, n_iter=50, cv=5, scoring=None, random_state=None, n_jobs=None):
+        self.param_distributions = param_distributions
+        self.n_iter = n_iter
+        super().__init__(estimator, cv=cv, scoring=scoring, n_jobs=n_jobs)
+
+    def _run_search(self, evaluate_candidates):
+        param_grid = list(ParameterGrid(self.param_distributions))
+        np.random.shuffle(param_grid)
+        evaluate_candidates(param_grid[:self.n_iter])
+
+    def _bayesian_optimize(self, param_grid):
+        def objective(params):
+            param_dict = {k: v for k, v in zip(self.param_distributions.keys(), params)}
+            self.estimator.set_params(**param_dict)
+            return -np.mean(cross_val_score(self.estimator, X, y, cv=self.cv, scoring=self.scoring))
+
+        bounds = [(0, 1) for _ in range(len(self.param_distributions))]
+        res = minimize(objective, bounds=bounds, method='L-BFGS-B')
+        return res.x
+
+    def fit(self, X, y=None, groups=None):
+        param_grid = self._bayesian_optimize(list(ParameterGrid(self.param_distributions)))
+        super().fit(X, y, groups)

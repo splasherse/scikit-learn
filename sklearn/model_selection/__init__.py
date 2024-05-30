@@ -37,6 +37,7 @@ from ._validation import (
     permutation_test_score,
     validation_curve,
 )
+from ..inspection._plot._shap import plot_shap_summary, shap_values
 
 if typing.TYPE_CHECKING:
     # Avoid errors in type checkers (e.g. mypy) for experimental estimators.
@@ -81,6 +82,8 @@ __all__ = [
     "train_test_split",
     "validation_curve",
     "ValidationCurveDisplay",
+    "shap_values",
+    "plot_shap_summary"
 ]
 
 
